@@ -1,0 +1,3 @@
+# Dev-only tools. The app itself needs none of these.
+fpdf2>=2.7.0      # generate sample documents (make_samples.py)
+pytest>=8.0.0     # unit tests (tests/)
