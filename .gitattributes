@@ -1,0 +1,5 @@
+# Normalize line endings to LF for text files; mark known binaries.
+* text=auto eol=lf
+*.png binary
+*.pdf binary
+*.ico binary
