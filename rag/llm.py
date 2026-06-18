@@ -101,3 +101,26 @@ class GroqClient:
             }
         ]
         return self._chat_raw(messages, config.VISION_MODEL, temperature=0.0, max_tokens=1024)
+
+    def transcribe_audio(self, audio_bytes, filename="audio.mp3", model=None):
+        """Transcribe an audio clip with Groq Whisper. Returns the transcript text."""
+        model = model or config.AUDIO_MODEL
+        last_err = None
+        n = len(self._clients)
+        for offset in range(n):
+            i = (self._idx + offset) % n
+            try:
+                resp = self._clients[i].audio.transcriptions.create(
+                    file=(filename, audio_bytes), model=model,
+                )
+                self._idx = i
+                return resp.text
+            except RateLimitError as e:
+                last_err = e
+                continue
+            except APIStatusError as e:
+                last_err = e
+                if getattr(e, "status_code", None) == 429:
+                    continue
+                raise
+        raise RuntimeError(f"All Groq keys are rate-limited or failing: {last_err}")

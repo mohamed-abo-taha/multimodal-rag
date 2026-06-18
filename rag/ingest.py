@@ -1,4 +1,4 @@
-"""Turn files (PDF / image / text) into clean text, then into chunks."""
+"""Turn files (PDF / image / audio / text) into clean text, then into chunks."""
 import io
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from . import config
 TEXT_EXTS = {".txt", ".md", ".markdown", ".csv", ".log", ".json", ".html"}
 PDF_EXTS = {".pdf"}
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mpga", ".mpeg"}
 
 
 def load_pdf(path):
@@ -30,13 +31,21 @@ def load_text(path):
 
 
 def load_image(path, llm=None):
-    """OCR + describe an image via Groq's vision model. Returns extracted text."""
+    """OCR + describe an image via Groq's vision model (no Tesseract needed)."""
     llm = llm or GroqClient()
     img = Image.open(path).convert("RGB")
     img.thumbnail((1568, 1568))  # downscale to keep the payload small
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=85)
     return llm.describe_image(buf.getvalue(), mime_type="image/jpeg")
+
+
+def load_audio(path, llm=None):
+    """Transcribe an audio file via Groq Whisper. Returns the transcript text."""
+    llm = llm or GroqClient()
+    with open(path, "rb") as f:
+        data = f.read()
+    return llm.transcribe_audio(data, filename=Path(path).name)
 
 
 def extract_text(path, llm=None):
@@ -46,6 +55,8 @@ def extract_text(path, llm=None):
         return load_pdf(path)
     if ext in IMAGE_EXTS:
         return load_image(path, llm=llm)
+    if ext in AUDIO_EXTS:
+        return load_audio(path, llm=llm)
     if ext in TEXT_EXTS:
         return load_text(path)
     # Last resort: try to read it as UTF-8 text.

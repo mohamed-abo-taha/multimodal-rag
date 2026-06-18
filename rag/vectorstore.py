@@ -54,6 +54,15 @@ class VectorStore:
     def count(self):
         return self.collection.count()
 
+    def delete_source(self, source):
+        """Remove every chunk belonging to a given source document."""
+        self.collection.delete(where={"source": source})
+
+    def get_source_text(self, source):
+        """Return all indexed text for one source, concatenated (for summarization)."""
+        got = self.collection.get(where={"source": source}, include=["documents"])
+        return "\n\n".join(got.get("documents") or [])
+
     def reset(self):
         name = self.collection.name
         self.client.delete_collection(name)

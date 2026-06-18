@@ -14,10 +14,13 @@ Built to run **locally**:
 
 ## Features
 
-- **Multi-modal ingest** — PDFs (pypdf), images (Groq vision OCR), and text/markdown.
+- **Multi-modal ingest** — PDFs (pypdf), images (Groq vision OCR), audio (Groq Whisper), and text/markdown.
 - **Conversational** — follow-ups like *"what about the stipend?"* are rewritten into a
   standalone search query using chat history, so retrieval stays accurate across turns.
 - **Streaming answers** in the web UI.
+- **Inline citations** — answers cite numbered sources `[1] [2]` that map to the exact retrieved passages.
+- **Optional re-ranking** — fetch extra candidates and let the LLM pick the most relevant for sharper answers.
+- **Model picker & doc tools** — switch Groq models, delete individual documents, one-click summaries.
 - **Grounded + cited** — answers use only retrieved context and name the source file(s) used.
 - **Local embeddings** — run on your CPU; only Groq generation hits the network.
 - **Bring your own key** — visitors can optionally paste their own Groq key in the sidebar, so a public demo doesn't share its quota.
@@ -66,6 +69,7 @@ Get a Groq key at <https://console.groq.com/keys>.
 .venv\Scripts\python.exe make_samples.py        # create a sample PDF + image
 .venv\Scripts\python.exe test_multimodal.py     # PDF extraction + image OCR
 .venv\Scripts\python.exe test_conversation.py   # multi-turn follow-up questions
+.venv\Scripts\python.exe eval.py                # scored retrieval-quality eval
 
 # unit tests:
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
