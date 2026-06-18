@@ -20,6 +20,7 @@ Built to run **locally**:
 - **Streaming answers** in the web UI.
 - **Grounded + cited** — answers use only retrieved context and name the source file(s) used.
 - **Local embeddings** — run on your CPU; only Groq generation hits the network.
+- **Bring your own key** — visitors can optionally paste their own Groq key in the sidebar, so a public demo doesn't share its quota.
 - **Resilient** — multiple Groq keys with automatic failover on rate limits.
 
 ## How it works

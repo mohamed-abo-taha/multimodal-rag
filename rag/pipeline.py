@@ -1,4 +1,8 @@
-"""High-level RAG orchestration: ingest -> (history-aware) retrieve -> grounded answer."""
+"""High-level RAG orchestration: ingest -> (history-aware) retrieve -> grounded answer.
+
+Every LLM-using method accepts an optional ``llm`` override so a per-request key
+(e.g. a visitor's own Groq key) can be used without touching the shared default.
+"""
 import os
 
 from .vectorstore import VectorStore
@@ -24,13 +28,15 @@ CONDENSE_PROMPT = (
 class RAGPipeline:
     def __init__(self):
         self.store = VectorStore()
-        self.llm = GroqClient()
+        # The LLM needs a Groq key. Allow running key-less so the UI can start and let
+        # a visitor supply their own key (self.llm stays None until then).
+        self.llm = GroqClient() if config.GROQ_API_KEYS else None
 
     # --- ingestion ----------------------------------------------------------
-    def ingest_file(self, path, source=None):
+    def ingest_file(self, path, source=None, llm=None):
         """Read a file, chunk it, and add it to the vector store."""
         source = source or os.path.basename(str(path))
-        full_text, chunks = file_to_chunks(path, llm=self.llm)
+        full_text, chunks = file_to_chunks(path, llm=llm or self.llm)
         n = self.store.add_chunks(chunks, source=source)
         return {"source": source, "chunks": n, "chars": len(full_text)}
 
@@ -41,14 +47,15 @@ class RAGPipeline:
             f"[Source: {h['metadata'].get('source', 'unknown')}]\n{h['text']}" for h in hits
         )
 
-    def _condense(self, question, history):
+    def _condense(self, question, history, llm=None):
         """Rewrite a follow-up into a standalone search query using recent history."""
-        if not history:
+        llm = llm or self.llm
+        if not history or llm is None:
             return question
         convo = "\n".join(
             f"{m['role'].upper()}: {m['content']}" for m in history[-config.HISTORY_TURNS:]
         )
-        rewritten = self.llm.chat(
+        rewritten = llm.chat(
             [{"role": "user", "content": CONDENSE_PROMPT.format(history=convo, question=question)}],
             temperature=0.0, max_tokens=128,
         )
@@ -63,10 +70,10 @@ class RAGPipeline:
         cited = [s for s in retrieved if s.lower() in low]
         return cited or retrieved
 
-    def prepare(self, question, history=None, top_k=None):
+    def prepare(self, question, history=None, top_k=None, llm=None):
         """Build everything needed to answer: standalone query, hits, and LLM messages."""
         history = history or []
-        search_query = self._condense(question, history)
+        search_query = self._condense(question, history, llm=llm)
         hits = self.store.query(search_query, top_k=top_k)
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         messages += [{"role": m["role"], "content": m["content"]}
@@ -79,15 +86,21 @@ class RAGPipeline:
         return {"search_query": search_query, "hits": hits, "messages": messages}
 
     # --- answering ----------------------------------------------------------
-    def answer(self, question, history=None, top_k=None):
+    def answer(self, question, history=None, top_k=None, llm=None):
         """Non-streaming answer (used by tests/CLI). Returns answer, sources, hits."""
-        prep = self.prepare(question, history, top_k)
+        llm = llm or self.llm
+        prep = self.prepare(question, history, top_k, llm=llm)
         if not prep["hits"]:
             return {
                 "answer": "No documents are indexed yet — upload and index some files first.",
                 "sources": [], "hits": [], "search_query": prep["search_query"],
             }
-        answer = self.llm.chat(prep["messages"])
+        if llm is None:
+            return {
+                "answer": "No Groq API key configured — add one to get answers.",
+                "sources": [], "hits": prep["hits"], "search_query": prep["search_query"],
+            }
+        answer = llm.chat(prep["messages"])
         return {
             "answer": answer,
             "sources": self.cited_sources(answer, prep["hits"]),
